@@ -1,0 +1,82 @@
+ std::optional<std::string> GetTaskFromSocket(tcp::socket &socket)
+    {
+
+        boost::system::error_code ec;
+        if (!Service::IsAliveSocket(socket))
+        {
+            // std::cerr << "THE SOCKET IS NOT ALIVE FOO\n";
+            return std::nullopt;
+        }
+        net::streambuf buffer;
+        ZyncPrint("Recievingfromsock.............");
+        auto sym_read = net::read(socket, buffer, ec);
+
+        ZyncPrint("EndRecievingfromsock.............");
+        if (sym_read == 0)
+        {
+            return std::nullopt;
+        }
+        if (ec && ec != net::error::eof)
+        {
+            // std::cout << "RETURNING GLOBAL EWRROR\n";
+            std::cout << ec.what() << '\n';
+            return std::nullopt;
+        }
+        return ExtractStrFromStreambuf(buffer);
+    }
+    
+    std::vector<task> ExtractObjectsfromSocket(tcp::socket &socket)
+    {
+        std::stringstream oss;
+        while (auto action = Service::GetTaskFromSocket(socket))
+        {
+            oss << *action;
+        };
+        return ExtractObjectsFromStream(oss);
+    };
+
+    std::vector<shared_task> ExtractSharedObjectsfromSocket(tcp::socket &socket)
+    {
+        std::stringstream oss;
+        while (auto action = Service::GetTaskFromSocket(socket))
+        {
+            oss << *action;
+        };
+        return ExtractSharedObjectsFromStream(oss);
+    };
+
+
+    std::vector<task> ExtractObjectsFromStream(std::stringstream &strm)
+    {
+
+        std::vector<task> tasks;
+        while (strm)
+        {
+            std::string tmp;
+            std::getline(strm, tmp, '\0');
+            if (tmp.empty())
+            {
+                break;
+            }
+            auto task = Service::DeserializeUmap<std::string, std::string>(std::move(tmp));
+            tasks.push_back(std::move(task));
+        };
+        return tasks;
+    }
+
+    std::vector<shared_task> ExtractSharedObjectsFromStream(std::stringstream &strm)
+    {
+        std::vector<shared_task> tasks;
+        while (strm)
+        {
+            std::string tmp;
+            std::getline(strm, tmp, '\0');
+            if (tmp.empty())
+            {
+                break;
+            }
+            auto action = std::make_shared<task>(Service::DeserializeUmap<std::string, std::string>(std::move(tmp)));
+            tasks.push_back(std::move(action));
+        };
+        return tasks;
+    }

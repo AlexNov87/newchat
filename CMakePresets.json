@@ -1,0 +1,19 @@
+{
+    "version": 8,
+    "configurePresets": [
+        {
+            "name": "tolch",
+            "displayName": "GCC 14.2.0 x86_64-w64-mingw32",
+            "description": "Using compilers: C = F:\\COMPILESOFT\\mingw64\\bin\\gcc.exe, CXX = F:\\COMPILESOFT\\mingw64\\bin\\g++.exe",
+            "generator": "MinGW Makefiles",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_TOOLCHAIN_FILE": "F:/COMPILESOFT/vcpkg/scripts/buildsystems/vcpkg.cmake",
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
+                "CMAKE_C_COMPILER": "F:/COMPILESOFT/mingw64/bin/gcc.exe",
+                "CMAKE_CXX_COMPILER": "F:/COMPILESOFT/mingw64/bin/g++.exe"
+            }
+        }
+    ]
+}
