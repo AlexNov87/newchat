@@ -9,32 +9,41 @@ struct Chatuser;
 
 class AbstractSession : public std::enable_shared_from_this<AbstractSession>
 {
+protected:
+private:
     void Read();
     void OnRead(err ec, size_t bytes);
     void OnWrite(bool keep_alive, err ec, size_t bytes);
     void Close();
+    void DoWrite();
 
     virtual std::string WhoAmI() { return "I AM ABSTRACT........"; };
     virtual std::string Iread() { return "ABSTRACT I READ"; };
     virtual std::string Iwrite() { return "ABSTRACT I WRITE"; };
-
+    
     static std::atomic_int exempslars;
-
-    std::mutex mtx_use_buf_;
-    std::mutex mtx_use_write_;
 
     friend class Chatroom;
     friend class Chatuser;
+    std::atomic_bool is_writing_ = false;
+    std::deque<std::string> write_queue_; 
 
 protected:
-    shared_flatbuf readbuf_ = Service::MakeSharedFlatBuffer();
     shared_stream stream_ = nullptr;
+    strand strand_;
+    shared_flatbuf readbuf_ = Service::MakeSharedFlatBuffer();
     request request_;
+
     AbstractSession(shared_stream stream)
-        : stream_(stream) { ZyncPrint("PROTOSESS: " + std::to_string(++exempslars) + " IS CONSTRUCTING"); };
+        : stream_(stream), strand_(net::make_strand(stream_->get_executor()))
+    {
+        ZyncPrint("PROTOSESS: " + std::to_string(++exempslars) + " IS CONSTRUCTING");
+    };
     virtual void StartAfterReadHandle() {};
     virtual std::string ExecuteReadySession(shared_task action) { return ""; };
     void Write(std::string respbody, http::status status = http::status::ok);
+
+    void PublicWrite(std::string message);
 
 public:
     void Run();
@@ -73,14 +82,11 @@ public:
 struct Chatuser : public AbstractSession
 {
     // stream, self, std::move(name), mainserv_->ioc_
-    Chatuser(shared_stream stream, std::weak_ptr<Chatroom> room, std::string name,
-             net::io_context &io) : AbstractSession(stream),
-                                    room_(room), name_(std::move(name)), strand_(Service::MakeSharedStrand(io)) {}
+    Chatuser(shared_stream stream, std::weak_ptr<Chatroom> room, std::string name) : AbstractSession(stream),
+                                                                                     room_(room), name_(std::move(name)) {}
 
     std::weak_ptr<Chatroom> room_;
     std::string name_;
-    shared_strand strand_;
-
     void StartAfterReadHandle() override;
     void BindAnotherReadBuffer(shared_flatbuf buffer);
 
@@ -146,7 +152,6 @@ private:
     std::string LoginUser(shared_task action, shared_flatbuf buffer, shared_stream stream);
     std::string AddUserToSQL(const std::string &name, const std::string &passhash);
 };
-
 
 /*
 auto data = readbuf_->data();

@@ -128,7 +128,7 @@ std::string MainServer::AddUserToSQL(const std::string &name, const std::string 
 
 
         */
-
+        
         return ServiceChatroomServer::Srv_MakeSuccessCreateUser(name);
     }
     catch (const std::exception &ex)

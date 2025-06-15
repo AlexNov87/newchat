@@ -39,6 +39,9 @@ const std::string CONSTANTS::RF_DIRECTION_CHATROOM = "DIRECTION_CHATROOM";
 const std::string CONSTANTS::IP = "IP"; 
 const std::string CONSTANTS::PORT = "PORT"; 
 const std::string CONSTANTS::CHATROOMS = "DEFAULT_CHATROOMS"; 
+const std::string DB_TABLE_NAME = "DB_TABLE_NAME";
+const std::string DB_USER = "DB_USER";
+const std::string DB_PASSORD = "DB_PASSORD";
 const std::string CONSTANTS::UNKNOWN = "UNKNOWN";
 
 

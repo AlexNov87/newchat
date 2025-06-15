@@ -40,12 +40,17 @@ struct CONSTANTS
     static const std::string RF_DIRECTION_SERVER;
     static const std::string RF_DIRECTION_CHATROOM;
 
-    static const std::string IP ; 
+    //конфиги загрузочные
+    static const std::string IP; 
     static const std::string PORT; 
     static const std::string CHATROOMS;
-    static const std::string UNKNOWN;
+    static const std::string DB_TABLE_NAME;
+    static const std::string DB_USER;
+    static const std::string DB_PASSORD;
      
 
+    static const std::string UNKNOWN;
+    
     ///@brief Длина токена
     static const size_t N_TOKEN_LEN;
     ///@brief

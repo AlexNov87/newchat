@@ -46,10 +46,9 @@ using task = std::unordered_map<std::string, std::string>;
 using task_complex = std::vector<task>;
 using shared_socket = std::shared_ptr<tcp::socket>;
 using shared_task = std::shared_ptr<task>;
-using strand = boost::asio::strand<boost::asio::io_context::executor_type>;
+using strand = boost::asio::strand<boost::asio::any_io_executor>;
 using shared_strand = std::shared_ptr<strand>;
 using err = boost::system::error_code;
-
 
 #include <boost/beast.hpp>
 namespace beast = boost::beast;
@@ -59,7 +58,6 @@ using response = http::response<http::string_body>;
 using stream = beast::tcp_stream;
 using shared_stream = std::shared_ptr<stream>;
 using shared_flatbuf = std::shared_ptr<beast::flat_buffer>;
-
 
 template <typename... Args>
 void ZyncPrint(Args... args)
@@ -192,7 +190,6 @@ namespace Service
     void MtreadRunContext(net::io_context &ioc);
 }
 
-
 namespace Service
 {
     ///@brief Проверяет жив ли сокет
@@ -202,9 +199,6 @@ namespace Service
     void ShutDownSocket(tcp::socket &sock);
     void ShutDownSocket(shared_socket sock);
 
-   
-    
-    
     shared_strand MakeSharedStrand(net::io_context &ioc);
     template <typename T>
     shared_socket MakeSharedSocket(T &executor)
@@ -214,8 +208,8 @@ namespace Service
     std::shared_ptr<MutableBufferHolder> MakeSharedMutableBuffer();
     std::shared_ptr<net::streambuf> MakeSharedStreambuf();
 
-    template<typename T>
-    shared_task ExtractSharedObjectsfromRequestOrResponce(T&req)
+    template <typename T>
+    shared_task ExtractSharedObjectsfromRequestOrResponce(T &req)
     {
         task action = Service::DeserializeUmap<std::string, std::string>(req.body());
         return std::make_shared<task>(std::move(action));
@@ -229,12 +223,12 @@ namespace Service
 namespace ServiceChatroomServer
 {
     std::optional<std::string> CHK_OneFieldExistsAndNotEmpty(const task &action, const std::string &fieldname);
-    
-    //ПРОВЕРЯЕТ ЕСТЬ ЛИ ПОЛЕ И ПУСТОЕ ЛИ ОНО СО МНОГИМИ АРГУМЕНТАМИ
+
+    // ПРОВЕРЯЕТ ЕСТЬ ЛИ ПОЛЕ И ПУСТОЕ ЛИ ОНО СО МНОГИМИ АРГУМЕНТАМИ
     template <typename... Args>
     std::optional<std::string> CHK_FieldExistsAndNotEmpty(const task &action, Args... args)
     {
-       
+
         std::vector<std::string> vec;
         (..., vec.push_back(args));
         for (auto sv : vec)
@@ -246,10 +240,36 @@ namespace ServiceChatroomServer
         }
         return std::nullopt;
     }
+
     
+    template <typename T>
+    std::optional<std::string> CHK_FieldLoadJSONServerOneField(const boost::json::object& obj, const T& fieldname){
+        if(!obj.contains(fieldname)){
+            return "YOU OBJECT HAS NO FIELD: " ;
+        }
+
+
+    };
+
+    
+    template <typename... Args>
+    std::optional<std::string> CHK_FieldLoadJSONServer(boost::json::value& loaded ,Args... args)
+    {
+        if(!loaded.is_object()){
+            return "THE OBJECT, WHICH YOUR LOADED, IS NOT A JSON - OBJECT";
+        }
+       // const auto&  = 
+       const boost::json::object& obj = loaded.as_object();
+        
+    
+
+
+        
+    }
+
     std::optional<std::string> CHK_ServerLoadObject(const boost::json::value &obj);
     ///@brief Создать о
-    std::string MakeAnswerError(std::string reason, std::string initiator,std::string action);
+    std::string MakeAnswerError(std::string reason, std::string initiator, std::string action);
     ///@brief Проверяет валидно ли поле "направление"
     std::optional<std::string> CHK_FieldDirectionIncorrect(const task &action);
     ///@brief Проверяет валиден ли запрос к чатруму
@@ -274,8 +294,6 @@ namespace ServiceChatroomServer
     // ОТВЕТ СЕРВЕРА НА УСПЕШНОЕ ПОЛУЧЕНИЕ СООБЩЕНИЯ ЮЗЕРА
     std::string Chr_MakeSuccessUserMessage(std::string username, std::string msg);
 
-    
-
 }
 
 namespace UserInterface
@@ -299,4 +317,3 @@ namespace UserInterface
     ///@brief Сериализованный объект для получения списка комнат
     std::string US_SrvMakeObjRoomList();
 }
-
