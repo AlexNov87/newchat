@@ -160,7 +160,7 @@ int main()
 {
   InitSocket(*socket__);
 
-  net::post(*strand__, []
+  net::post(*strandwr__, []
             { Read(); });
 
   net::post(*strandwr__, []

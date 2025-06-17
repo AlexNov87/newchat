@@ -26,7 +26,7 @@ private:
     friend class Chatroom;
     friend class Chatuser;
     std::atomic_bool is_writing_ = false;
-    std::deque<std::string> write_queue_;
+    std::deque<response> write_queue_;
     std::mutex mtx_; 
 
 protected:
@@ -42,9 +42,8 @@ protected:
     };
     virtual void StartAfterReadHandle() {};
     virtual std::string ExecuteReadySession(shared_task action) { return ""; };
-    void Write(std::string respbody, http::status status = http::status::ok);
-
-    void PublicWrite(std::string message);
+    void Write(response responce);
+    void PublicWrite(response response);
 
 public:
     void Run();
@@ -85,13 +84,14 @@ struct Chatuser : public AbstractSession
     // stream, self, std::move(name), mainserv_->ioc_
     Chatuser(shared_stream stream, std::weak_ptr<Chatroom> room, std::string name) : AbstractSession(stream),
                                                                                      room_(room), name_(std::move(name)) {}
+
     std::weak_ptr<Chatroom> room_;
     std::string name_;
     void StartAfterReadHandle() override;
     void BindAnotherReadBuffer(shared_flatbuf buffer);
 
     std::string ExecuteReadySesion(shared_task action);
-    std::string WhoAmI() override { return "I AM CHATUSER........"; }; 
+    std::string WhoAmI() override { return "I AM CHATUSER........"; };
 };
 
 class Chatroom : public std::enable_shared_from_this<Chatroom>

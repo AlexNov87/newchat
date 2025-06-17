@@ -5,7 +5,7 @@ std::atomic_int AbstractSession::exempslars = 0;
 void AbstractSession::Read()
 {
     request_ = {};
-    //ПРОВЕРЯЕМ ЖИВ ЛИ СТРИМ
+    // ПРОВЕРЯЕМ ЖИВ ЛИ СТРИМ
     if (!stream_)
     {
         ZyncPrint("STREAM SESSION IS DAMAGED........READ()");
@@ -44,88 +44,110 @@ void AbstractSession::Run()
         ZyncPrint("THE STREAM IS DAMAGED...........RUN()");
         return;
     }
-    //Асинхронно ставим на прослушку
+    // Асинхронно ставим на прослушку
     net::dispatch(strand_,
                   beast::bind_front_handler(
                       &AbstractSession::Read,
                       shared_from_this()));
 };
 
-void AbstractSession::PublicWrite(std::string message)
+void AbstractSession::PublicWrite(response responce)
 {
-    //Ставим сообщение со стороны в очередь безопасно на запись
-    net::post(strand_, [self = shared_from_this(), msg = std::move(message)]()
-              { 
-                self->Write(std::move(msg)); 
-              });
+    // Ставим сообщение со стороны в очередь безопасно на запись
+    net::post(strand_, [self = shared_from_this(), msg = std::move(responce)]()
+              { self->Write(std::move(msg)); });
 }
 
-
-void AbstractSession::Write(std::string responce_body, http::status status)
+void AbstractSession::Write(response responce)
 {
     try
     {
-        //Ставим в очередь сообщение на запись
-        write_queue_.push_back(std::move(responce_body));
+        // Ставим в очередь сообщение на запись
+        write_queue_.push_back(responce);
 
         // Если уже идет запись, просто добавляем в очередь и выходим.
         // OnWrite запустит следующую запись.
-        if (is_writing_) { return;}
-        
+        if (is_writing_)
+        {
+            return;
+        }
+
+        if (!strand_.running_in_this_thread())
+        {
+            //  Не должны сюда попасть.  Если попали - серьезная ошибка.
+            ZyncPrint("ERROR: DoWrite called outside of strand!");
+            return; // Или даже throw exception
+        }
+
         // Запускаем цикл записи
         DoWrite();
     }
     catch (const std::exception &ex)
     {
-        ZyncPrint("WriteToSocketEXCERPTION", ex.what());
+        ZyncPrint("WriteEXCERPTION", ex.what());
     }
 };
 
 void AbstractSession::DoWrite()
 {
-    // Мы уже внутри strand'а
-    if (write_queue_.empty())
-    {
-        is_writing_ = false;
-        Read();  //В нейронк
-        return;
-    }
-    response rsp(Service::MakeResponce(
-        11, true, http::status::ok, std::move(write_queue_.front())));
 
-    is_writing_ = true;
-    
-    ZyncPrint("Now WIOLL WRITE", rsp.body());
-    
-    // Берем первое сообщение из очереди и отправляем его
-    http::async_write(*stream_, rsp,
-                      beast::bind_front_handler(&AbstractSession::OnWrite, shared_from_this(), true));
+    try
+    {
+        // Мы уже внутри strand'а
+        if (write_queue_.empty())
+        {
+            is_writing_ = false;
+            Read(); // В нейронк
+            return;
+        }
+
+        is_writing_ = true;
+
+        ZyncPrint("Now WIOLL WRITE", write_queue_.front().body());
+
+        // Берем первое сообщение из очереди и отправляем его
+
+        http::async_write(*stream_, std::move(write_queue_.front()),
+                          beast::bind_front_handler(&AbstractSession::OnWrite, shared_from_this(), true));
+    }
+    catch (const std::exception &ex)
+    {
+        ZyncPrint("DOWriteEXCERPTION", ex.what());
+    }
 }
 
 void AbstractSession::OnWrite(bool keep_alive, beast::error_code ec, std::size_t bytes_transferred)
 {
 
-    if (!keep_alive)
+    try
     {
-        Close();
+        if (!keep_alive)
+        {
+            Close();
+        }
+
+        boost::ignore_unused(bytes_transferred);
+
+        if (ec)
+        {
+            ZyncPrint("ERROR ON WRITE.................", ec.message());
+            return;
+        }
+        // Убираем из очереди то, что только что отправили
+
+        write_queue_.pop_front();
+        // Запускаем запись следующего сообщения из очереди, если оно есть
+        DoWrite();
     }
-
-    boost::ignore_unused(bytes_transferred);
-
-    if (ec)
+    catch (const std::exception &ex)
     {
-        ZyncPrint("ERROR ON WRITE.................", ec.message());
-        return;
+        ZyncPrint("OnWriteEXCERPTION", ex.what());
     }
-    // Убираем из очереди то, что только что отправили
-   
-    write_queue_.pop_front();
-    // Запускаем запись следующего сообщения из очереди, если оно есть
-    DoWrite();
 }
 
 void AbstractSession::Close()
 {
     beast::error_code ec;
     stream_->socket().shutdown(tcp::socket::shutdown_send, ec);
+    stream_->socket().close(ec);
 }

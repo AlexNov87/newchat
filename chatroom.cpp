@@ -2,7 +2,6 @@
 
 bool Chatroom::HasToken(const std::string &token)
 {
-    std::lock_guard<std::mutex> lg(mtx_);
     return users_.contains(token);
 }
 
@@ -30,12 +29,15 @@ bool Chatroom::AddUser(shared_stream stream , shared_flatbuf buffer, std::string
         //Не запускаем прослушивание стрима , он был запущен в Сервер - сессии 
        // users_.at(token)->Run();
          
-        users_.at(token)->PublicWrite(ServiceChatroomServer::Srv_MakeSuccessLogin
-        (token, this->name_, this->msg_man_.LastMessages()));
+        auto str = ServiceChatroomServer::Srv_MakeSuccessLogin (token, this->name_, this->msg_man_.LastMessages());
+        auto responce = Service::MakeResponce(11, true, http::status::ok, std::move(str));
+        users_.at(token)->PublicWrite(std::move(responce));
 
 
          for(int i=0; i < 10; ++ i){
-            users_.at(token)->PublicWrite(ServiceChatroomServer::MakeAnswerError("TST", "TST", "TST"));
+            auto s = ServiceChatroomServer::MakeAnswerError("TST", "TST", "TST");
+            auto rsp = Service::MakeResponce(11, true, http::status::ok, std::move(s));
+            users_.at(token)->PublicWrite(std::move(rsp));
          }
 
         // ЛОГИРУЕМ СИТЕМНОЕ СООБЩЕНИЕ
@@ -47,10 +49,11 @@ bool Chatroom::AddUser(shared_stream stream , shared_flatbuf buffer, std::string
 
 void Chatroom::SendMessages(const std::string &token, const std::string &name, const std::string &message)
 {
-
+     
     // Создаем тело ответа
     auto str = ServiceChatroomServer::Chr_MakeSuccessUserMessage(name, message);
- 
+    auto responce = Service::MakeResponce(11, true, http::status::ok, std::move(str));
+    
     std::lock_guard<std::mutex> lg(mtx_);
     std::cout << users_.at(token)->name_ << " : " << message << '\n';
     // Рассылка
@@ -61,9 +64,7 @@ void Chatroom::SendMessages(const std::string &token, const std::string &name, c
         {
             continue;
         }
-        // Пишем каждому юзеру в сокет сообщение, OnWrite вызовет 
-        //Read и снова  станет на прослушку.
-        chatuser->PublicWrite(str);
+        chatuser->PublicWrite(responce);
     };
 }
 

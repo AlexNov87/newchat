@@ -60,14 +60,16 @@ void ServerSession::StartExecuteAction(shared_task action)
             // При логине пользователя вернется "" значит закрываем сесссию
             return;
         }
-        Write(std::move(responce_body));
+        auto responce = Service::MakeResponce(11, true, http::status::ok, std::move(responce_body)); 
+        PublicWrite(std::move(responce));
     } // try
     catch (const std::exception &ex)
     {
         // ловим всевозможные исключения
         std::string responce_body = ServiceChatroomServer::MakeAnswerError(ex.what(), "StartExecuteAction()Exc2", CONSTANTS::UNKNOWN);
         ZyncPrint("StartExecuteAction()Exc2");
-        Write(std::move(responce_body));
+        auto responce = Service::MakeResponce(11, true, http::status::ok, std::move(responce_body)); 
+            PublicWrite(std::move(responce));
     }
 };
 
@@ -79,7 +81,9 @@ void ServerSession::StartAfterReadHandle()
         shared_task action = Service::ExtractSharedObjectsfromRequestOrResponce(request_);
         if (!action)
         {
-            Write(ServiceChatroomServer::MakeAnswerError("Action is nullptr", "StartAfterReadHandle1()", CONSTANTS::UNKNOWN));
+            std::string responce_body = ServiceChatroomServer::MakeAnswerError("Action is nullptr", "StartAfterReadHandle1()", CONSTANTS::UNKNOWN);
+            auto responce = Service::MakeResponce(11, true, http::status::ok, std::move(responce_body)); 
+            PublicWrite(std::move(responce));
             return;
         }
         StartExecuteAction(action);
@@ -88,7 +92,8 @@ void ServerSession::StartAfterReadHandle()
     catch (const std::exception &ex)
     {
         std::string responce_body = ServiceChatroomServer::MakeAnswerError(ex.what(), "StartAfterReadHandle2()", CONSTANTS::UNKNOWN);
+        auto responce = Service::MakeResponce(11, true, http::status::ok, std::move(responce_body)); 
         ZyncPrint("StartAfterReadHandle2()");
-        Write(std::move(responce_body));
+        PublicWrite(std::move(responce));
     }
 };

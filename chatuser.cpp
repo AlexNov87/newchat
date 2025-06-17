@@ -55,7 +55,8 @@
     {
         auto action = Service::ExtractSharedObjectsfromRequestOrResponce(request_);
         auto resp_body = ExecuteReadySesion(action);
-        PublicWrite(std::move(resp_body));
+        auto responce = Service::MakeResponce(11, true, http::status::ok, std::move(resp_body)); 
+        PublicWrite(std::move(responce));
     };
 
     void Chatuser::BindAnotherReadBuffer(shared_flatbuf buffer)
