@@ -56,8 +56,8 @@ void AbstractSession::PublicWrite(std::string message)
     //Ставим сообщение со стороны в очередь безопасно на запись
     net::post(strand_, [self = shared_from_this(), msg = std::move(message)]()
               { 
-                ZyncPrint("PublicWrite");
-                self->Write(std::move(msg)); });
+                self->Write(std::move(msg)); 
+              });
 }
 
 
@@ -70,11 +70,8 @@ void AbstractSession::Write(std::string responce_body, http::status status)
 
         // Если уже идет запись, просто добавляем в очередь и выходим.
         // OnWrite запустит следующую запись.
-        if (is_writing_)
-        {
-            return;
-        }
-
+        if (is_writing_) { return;}
+        
         // Запускаем цикл записи
         DoWrite();
     }
@@ -97,6 +94,9 @@ void AbstractSession::DoWrite()
         11, true, http::status::ok, std::move(write_queue_.front())));
 
     is_writing_ = true;
+    
+    ZyncPrint("Now WIOLL WRITE", rsp.body());
+    
     // Берем первое сообщение из очереди и отправляем его
     http::async_write(*stream_, rsp,
                       beast::bind_front_handler(&AbstractSession::OnWrite, shared_from_this(), true));

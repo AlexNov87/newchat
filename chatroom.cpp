@@ -32,11 +32,12 @@ bool Chatroom::AddUser(shared_stream stream , shared_flatbuf buffer, std::string
          
         users_.at(token)->PublicWrite(ServiceChatroomServer::Srv_MakeSuccessLogin
         (token, this->name_, this->msg_man_.LastMessages()));
-        
-        for(int i = 0; i < 10; ++i){
-                 users_.at(token)->PublicWrite(ServiceChatroomServer::MakeAnswerError("TTX","TTX","TTX"));
-        }
-        
+
+
+         for(int i=0; i < 10; ++ i){
+            users_.at(token)->PublicWrite(ServiceChatroomServer::MakeAnswerError("TST", "TST", "TST"));
+         }
+
         // ЛОГИРУЕМ СИТЕМНОЕ СООБЩЕНИЕ
         msg_man_.ServiceMessage(users_.at(token)->name_ + " IS CONNECTED");
         return success;
@@ -69,6 +70,7 @@ void Chatroom::SendMessages(const std::string &token, const std::string &name, c
 void Chatroom::DeleteUser(std::string token)
 {
     std::lock_guard<std::mutex> lg(mtx_);
+    users_.at(token)->Close();
     users_.erase(token);
 }
 
