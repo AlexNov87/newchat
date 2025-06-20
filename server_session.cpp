@@ -61,7 +61,7 @@ void ServerSession::StartExecuteAction(shared_task action)
             return;
         }
         auto responce = Service::MakeResponce(11, true, http::status::ok, std::move(responce_body)); 
-        PublicWrite(std::move(responce));
+            PublicWrite(std::move(responce));
     } // try
     catch (const std::exception &ex)
     {

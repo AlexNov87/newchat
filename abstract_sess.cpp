@@ -1,9 +1,18 @@
+// pvs pvs
+// pvs pvs
+
 #include "srv.h"
 std::atomic_int AbstractSession::exempslars = 0;
 ////////////////////////////////
 
 void AbstractSession::Read()
 {
+    std::lock_guard<std::mutex> lg(mtx_read_);
+    if (is_reading_)
+    {
+        return;
+    };
+
     request_ = {};
     // ПРОВЕРЯЕМ ЖИВ ЛИ СТРИМ
     if (!stream_)
@@ -18,7 +27,7 @@ void AbstractSession::Read()
         Service::ShutDownSocket(stream_->socket());
         return;
     }
-
+    is_reading_.exchange(true);
     // Начинаем асинхронноен чтение
     //  std::lock_guard<std::mutex> lg(mtx_use_buf_);
     http::async_read(*stream_, *readbuf_, request_,
@@ -27,6 +36,7 @@ void AbstractSession::Read()
 
 void AbstractSession::OnRead(err ec, size_t bytes)
 {
+    is_reading_.exchange(false);
     if (!ec)
     { // Обрабатываем прочитанные данные
         StartAfterReadHandle();
@@ -62,25 +72,15 @@ void AbstractSession::Write(response responce)
 {
     try
     {
-        // Ставим в очередь сообщение на запись
-        write_queue_.push_back(responce);
 
-        // Если уже идет запись, просто добавляем в очередь и выходим.
-        // OnWrite запустит следующую запись.
-        if (is_writing_)
+        std::lock_guard<std::mutex> lock(mtx_);
+        write_queue_.push_back(std::move(responce));
+
+        if (!is_writing_) // Атомарно устанавливаем is_writing_ в true и проверяем предыдущее значение.
         {
-            return;
+            is_writing_.exchange(true);
+            net::post(strand_, beast::bind_front_handler(&AbstractSession::DoWrite, shared_from_this()));
         }
-
-        if (!strand_.running_in_this_thread())
-        {
-            //  Не должны сюда попасть.  Если попали - серьезная ошибка.
-            ZyncPrint("ERROR: DoWrite called outside of strand!");
-            return; // Или даже throw exception
-        }
-
-        // Запускаем цикл записи
-        DoWrite();
     }
     catch (const std::exception &ex)
     {
@@ -93,21 +93,24 @@ void AbstractSession::DoWrite()
 
     try
     {
-        // Мы уже внутри strand'а
+
+        std::lock_guard<std::mutex> lock(mtx_);
         if (write_queue_.empty())
         {
-            is_writing_ = false;
-            Read(); // В нейронк
+            is_writing_.store(false); //  Обязательно сбрасываем флаг, когда очередь пуста
+            net::post(strand_, [self = shared_from_this()]
+                      { self->Read(); }); // В нейронк
             return;
         }
 
-        is_writing_ = true;
+        // ZyncPrint("NOW WILL WRITE",  write_queue_.front());
+        response rsp = std::move(write_queue_.front()); // Copy the response
+        write_queue_.pop_front();                       // Удаляем из очереди после копирования
 
-        ZyncPrint("Now WIOLL WRITE", write_queue_.front().body());
+        // Не знаю где гонка, но проблему решает
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
-        // Берем первое сообщение из очереди и отправляем его
-
-        http::async_write(*stream_, std::move(write_queue_.front()),
+        http::async_write(*stream_, std::move(rsp), // move the copy
                           beast::bind_front_handler(&AbstractSession::OnWrite, shared_from_this(), true));
     }
     catch (const std::exception &ex)
@@ -124,6 +127,7 @@ void AbstractSession::OnWrite(bool keep_alive, beast::error_code ec, std::size_t
         if (!keep_alive)
         {
             Close();
+            return;
         }
 
         boost::ignore_unused(bytes_transferred);
@@ -133,11 +137,9 @@ void AbstractSession::OnWrite(bool keep_alive, beast::error_code ec, std::size_t
             ZyncPrint("ERROR ON WRITE.................", ec.message());
             return;
         }
-        // Убираем из очереди то, что только что отправили
 
-        write_queue_.pop_front();
-        // Запускаем запись следующего сообщения из очереди, если оно есть
-        DoWrite();
+        // net::post - Запускаем DoWrite в strand, *после* завершения текущей операции.
+        net::post(strand_, beast::bind_front_handler(&AbstractSession::DoWrite, shared_from_this()));
     }
     catch (const std::exception &ex)
     {
@@ -149,5 +151,13 @@ void AbstractSession::Close()
 {
     beast::error_code ec;
     stream_->socket().shutdown(tcp::socket::shutdown_send, ec);
+    if (ec)
+    {
+        ZyncPrint("CLOSE1", ec.message());
+    }
     stream_->socket().close(ec);
+    if (ec)
+    {
+        ZyncPrint("CLOSE2", ec.message());
+    }
 }

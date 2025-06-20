@@ -13,7 +13,6 @@ bool MainServer::AlreadyUserRegistered(const std::string &name)
 bool MainServer::IsAutorizatedUser(const std::string &name, const std::string &passhash)
 {
     return true; // Заглушка, Убрать......
-
     // Во время проверки поле users_hash_ не должно модифицироваться
     std::lock_guard<std::mutex> lg(mtx_lock_sql_operations_);
     if (!users_hash_.contains(name))

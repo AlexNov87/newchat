@@ -26,14 +26,18 @@ private:
     friend class Chatroom;
     friend class Chatuser;
     std::atomic_bool is_writing_ = false;
+    std::atomic_bool is_reading_ = false;
     std::deque<response> write_queue_;
     std::mutex mtx_; 
+    
+    
 
 protected:
     shared_stream stream_ = nullptr;
     strand strand_;
     shared_flatbuf readbuf_ = Service::MakeSharedFlatBuffer();
     request request_;
+    std::mutex mtx_read_;
 
     AbstractSession(shared_stream stream)
         : stream_(stream), strand_(net::make_strand(stream_->get_executor()))
@@ -87,6 +91,7 @@ struct Chatuser : public AbstractSession
 
     std::weak_ptr<Chatroom> room_;
     std::string name_;
+    
     void StartAfterReadHandle() override;
     void BindAnotherReadBuffer(shared_flatbuf buffer);
 
